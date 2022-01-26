@@ -1,0 +1,343 @@
+---
+title: "Report wage prediction in legal jobs"
+author: 'Péter ENDES-NAGY'
+output: 
+  pdf_document:
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(fig.pos = "!H", out.extra = "")
+# Set graph size
+#knitr::opts_chunk$set(echo = FALSE, out.width = "50%" )#fig.asp = 0.5, fig.width = 7, out.width = "90%" )
+#rm(list=ls())
+
+#import relevant libraries
+library(tidyverse)
+library(caret)
+library(modelsummary)
+library(fixest)
+library(lspline)
+library(knitr)
+
+#import full dataset + transform character variables into factors
+cps <- read_csv('https://osf.io/4ay9x/download', 
+               col_types = cols(.default = "?", 
+                                state = "c")) %>% 
+  mutate_if(is.character, factor)
+```
+
+## Introduction
+
+This is a report on *predicting hourly wages in legal jobs*. 4 models were built for predicting hourly (log) wages in the legal field, based on 2014's CPS data. The first 3 models are simple OLS regressions, gradually more complex, the predictors were chosen based on field knowledge and availability of variables in the dataset. The 4th Model was derived from the 3rd Model with LASSO. 
+
+## Data
+
+I used data from the 2014's Current Population Survey (CPS), that is a monthly survey of about 60,000 households in the US. A detailed description of the Survey and the methodology is available here: <https://osf.io/uqe8z/>  
+
+I was interested interested in legal occupations, so I narrowed down my sample to this field, using `2100` (Lawyers, Judges, magistrates, and other judicial workers), `2105` (Judicial law clerks), `2145` (Paralegals and legal assistant) and `2160` (Miscellaneous legal support workers) census codes. 
+
+## Data cleaning and EDA
+Without getting into too many technical details, the potential predictor variables were inspected on by one, some simplyfied and recoded into other variables.  
+
+```{r cleaning , include = F }
+###CLEANING and FILTERING
+df <- data.frame()
+df <- cps %>%
+  #differentiate between higher level (1) and supporting jobs (0) in the legal field (everything else is NA)
+  mutate( occ = ifelse( occ2012 == 2100 , 1 , 
+                        ifelse( occ2012 >= 2105 & occ2012 <= 2160 , 0 , NA ) ) ) %>%
+  #filter out other occupations (NA)
+  filter( !is.na(occ) )
+
+#check race
+datasummary( as.factor(race) ~ N + Percent() , data = df)
+#simplify into white and POC
+df$race <- ifelse( df$race == 1 , 1 , 0 )
+
+#check marital status
+datasummary( as.factor(marital) ~ N + Percent() , data = df)
+#most of them married, divorced or never married -> simplify into married (1) or unmarried (0)
+df$marital <- ifelse( df$marital < 4 , 1 , 0 )
+
+
+#check presence of children 
+datasummary( as.factor(chldpres) ~ N + Percent() , data = df)
+#makes sense to simplify into child under 19yo (1) and no child under 18yo (0)
+df$chldpres <-  ifelse( df$chldpres == 0 , 0 , 1 ) 
+
+#check education level
+datasummary( as.factor(grade92) ~ N + Percent() , data = df)
+#in the legal field, it would make sense excluding those without a university degree, but their share is surprisingly high
+datasummary( as.factor(grade92) * as.factor(occ) ~ N + Percent() , data = df)
+#they work in supporting roles as it turns out so even those with only high school diploma (not even some college) can be kept. 
+#instead of filtering, let's simplify education level into 
+#    above undergrad (0), above high school (1), max. high school (2) and treat it as a factor
+df$education <-  as.factor(ifelse( df$grade92 > 43 , 0 , 
+                              ifelse( df$grade92 > 39 , 1 , 2 ) ) )
+
+#check whether native US born or something else
+datasummary( prcitshp ~ N + Percent() , data = df)
+#turns out 93% of the sample is native US citizen, 5% is naturalized citizen and only 2% not a US citizen 
+#we won't include it in any models
+df <- select( df , -prcitshp )
+
+#check sector (govt or private)
+datasummary( class ~ N + Percent() , data = df)
+#makes more sense simplyfing into Gov (0) and Private sector (1)
+df$sector <- ifelse( as.numeric(df$class) > 3 , 1 , 0 )
+
+#check gender
+datasummary( as.factor(sex) ~ N + Percent() , data = df)
+#instead of a factor, let's transform it into binary (0,1)
+df$sex <- df$sex - 1 
+
+#check employment status 
+datasummary( lfsr94 ~ N + Percent() , data = df)
+#it seems that 2% of the sample is employed but absent. Let's narrow it down to those who are employed and at work
+df <- filter( df , as.numeric( lfsr94) == 2 ) 
+
+
+#what about missing values?
+summary(df)
+# there are 2 vars with missing values but they aren't much interesting: ethnic and unioncov -> we don't need imputation 
+# they can be also excluded, just like other unnecesarry variables
+df <- select( df , -c( "ethnic" , "unioncov" , "intmonth" , 'grade92' , "ownchild" , "state" , "class" , "unionmme" , "lfsr94" , "ind02" , "occ2012" ) )
+
+```
+
+There is a hierarchy among the 4 included occupations, some seems to have a rather supporting role, so a binary `occupation` variable was created. `race` was simplified into white and POC - POC usually face discrimination on the labor market. `marital` status was simplified into married and never married, `chldpres` (presence of a child) and having a child under 18yo or not. Man are usually rewarded and women are penalized for being married or having a child on the labor market, so these variables are going to be used in interaction with `gender`. `sector` was also simplified into a binary variable, differentiating between government and private sector as the hourly wages can be very different in them. Level of education was recoded, treating differently the graduated, those who have some or finished higher education degrees and those who have high school diploma or less - as most jobs in the legal field require MA or MBA, everyone under a BA degree could have been discarded, but it turns out they predominantly work in the supporting roles, so it makes sense keeping them in the sample.  
+
+Furthermore, those who marked "Employed - but absent" were filtered out (2% of the original sample). Imputation wasn't necessary as none of the chosen predictors had missing values. 
+
+```{r cleaning2 , include = F }
+
+###NEW VARIABLES AND TRANSFORMATIONS
+
+#Y: log earning
+#calculate hourly wages
+df$w <-  df$earnwke/df$uhours
+#calculate log wages 
+df$lnw <- log( df$w )
+
+#1 observation is almost 500, He worked one hour. Extreme value that can be discarded. 
+p <- ggplot( subset( df ) , aes( y = ..density.. ) )
+
+p + geom_histogram( aes( w  ) )
+p + geom_histogram( aes( lnw ) )
+
+df <- subset( df , w < 200 )
+#we have a very extreme value, almost 500 USD/h. He worked only one hour, the observation can be discarded. 
+#hourly wage follows lognormal distribution -> ln(wage) is better than level 
+#small NOTE: the hourly wages are capped, probably due to public employment. 
+
+
+#check numeric variables and create new vars if necessary 
+
+#age
+ggplot( df , aes( age , lnw ) ) + geom_point() + geom_smooth()
+#not linear, could be a spline (cut at age 35)
+```
+
+By inspecting y, the hourly wage, a log transformation was decided as the hourly wage distribution is close to lognormal distribution - after the transformation, the distribution is still strongly skewed, the hourly wages seem to be capped. An extreme value of almost 500 USD/hour was discarded - the person worked only 1 hour.  
+
+The only continuous numeric predictor is age. Plotting against hourly wage, a spline at age 35 is recommended in the models. 
+
+At the end, I arrived to a sample with `r nrow(df)` observations. 
+
+## Model building 
+First of all, the sample was split into a working and hold-out sample. The model building was carried out on the working sample.  
+
+```{r split_houldout_working , include = F }
+## Split into holdout (20%) and working (80%) datasets in advance 
+smp_size <- floor( 0.2 * nrow( df ) )
+seed_val <- 1000
+set.seed(seed_val)
+
+holdout_ids <- sample( seq_len( nrow( df ) ) , size = smp_size )
+df$holdout <- 0
+df$holdout[holdout_ids] <- 1
+
+df_holdout <- df %>% filter( holdout == 1)
+df_work <- df %>% filter (holdout == 0)
+
+```
+
+3 Models were built by adding more and more variables. A 4th Model was built with LASSO, based on Model 3.  
+**Model 1**: `sex` , `education`  
+**Model 2**: Model1 , `occ` (supporting roles) , `age` (spline at age 35)  
+**Model 3**: Model2 , `race` , `sector` (govt/private) , `chldpres` (child under 18yo or not) , `marital` , `stfips` (State) , `chldpres*sex` (interaction: having child under 18yo and gender) , `marital*sex` (interaction: marital status and gender) 
+
+Model 1-3 were run with 5-fold cross-validation. 
+
+```{r run_models , include = F }
+## define variables per models 
+model1_vars <- c( 'sex' , 'education' )
+model2_vars <- c( model1_vars ,  'occ' , 'lspline( age , 35)'  )
+model3_vars <- c( model2_vars , 'race' , 'sector' , 'chldpres' , 'marital' , 'stfips' , 
+                  'chldpres*sex' , 'marital*sex' )
+
+# Run Model1-3
+k_folds <- 5
+for ( i in 1:3 ){
+  print( paste0( "Estimating model: " , i ) )
+  # Get the model name
+  model_name <-  paste0( "model" , i , "_vars" )
+  model_pretty_name <- paste0( "M" , i )
+  # Specify the formula
+  yvar <- "lnw"
+  xvars <- eval( parse( text = model_name ) )
+  formula <- formula( paste0( yvar , " ~ ", paste( xvars , collapse = " + ") ) )
+  
+  # Estimate model on the whole sample
+  model_work_data <- feols( formula , data = df_work , vcov = 'hetero' )
+  #  and get the summary statistics
+  fs  <- fitstat( model_work_data , c( 'rmse' , 'r2' , 'bic' ) )
+  BIC <- fs$bic
+  r2  <- fs$r2
+  rmse_train <- fs$rmse
+  ncoeff <- length( model_work_data$coefficients )
+  
+  # Do the k-fold estimation
+  set.seed(seed_val)
+  cv_i <- train( formula, df_work, method = "lm" , 
+                 trControl = trainControl( method = "cv" , number = k_folds ) )
+  rmse_test <- mean( cv_i$resample$RMSE )
+  
+  # Save the results
+  model_add <- tibble( Model = model_pretty_name , Coef = ncoeff ,
+                      R_squared = r2 , BIC = BIC , 
+                      Training_RMSE = rmse_train , Test_RMSE = rmse_test )
+  if ( i == 1 ){
+    model_results <- model_add
+  } else{
+    model_results <- rbind( model_results , model_add )
+  }
+}
+
+model_results
+
+# use LASSO for Model4, checking out if we have redundant variables in Model3
+model4_vars <- c( 'sex' , 'education' , 'occ' , 'lspline( age , 35)' ,
+                  'chldpres' , 'marital' , 'race' , 'sector' , 'stfips' , 
+                  'age*sex' , 'chldpres*sex' , 'marital*sex' )
+
+#Set tuning parameters
+train_control <- trainControl( method = "cv", number = k_folds)
+tune_grid <- expand.grid( "alpha" = c(1), "lambda" = seq( 0.05 , 1 , by = 0.05 ) )
+formula <- formula( paste0( "lnw ~ ", paste( model4_vars , collapse = " + ") ) )
+
+# Run LASSO
+lasso_model <- caret::train( formula,
+                            data = df_work,
+                            method = "glmnet",
+                            preProcess = c( "center" , "scale" ),
+                            trControl = train_control,
+                            tuneGrid = tune_grid,
+                            na.action = na.exclude)
+# Check the output
+lasso_model
+# Penalty parameters
+lasso_model$bestTune
+# Check the optimal lambda parameter
+lasso_model$bestTune$lambda
+# Check the RMSE curve
+plot( lasso_model )
+
+#get the coefficients as well
+lasso_coeffs <- coef( lasso_model$finalModel , lasso_model$bestTune$lambda ) %>%
+  as.matrix() %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "variable") %>%
+  rename( coefficient = `s1` )
+
+lasso_coeffs
+
+# Check the number of variables which actually has coefficients other than 0
+lasso_coeffs_nz <- lasso_coeffs %>%
+  filter( coefficient != 0 ) 
+print(lasso_coeffs_nz)
+
+# Get the RMSE of the Lasso model 
+lasso_fitstats <- lasso_model$results %>%
+  filter(lambda == lasso_model$bestTune$lambda ) 
+lasso_fitstats
+# Create an auxilary tibble
+lasso_add <- tibble( Model = 'M4' , Coef = nrow(lasso_coeffs_nz) ,
+                    R_squared = lasso_fitstats$Rsquared , BIC = NA, 
+                    Training_RMSE = NA, Test_RMSE = lasso_fitstats$RMSE )
+# Add it to final results
+model_results <- rbind( model_results , lasso_add )
+```
+
+Regarding Model 4, LASSO ended up with a lambda value of `r lasso_model$bestTune$lambda`, the minimum that I set during the tuning. LASSO was also run with other tuning parameters (lambda starting from 0.01, increased by 0.01). It preferred a lambda as small as possible and not surprisingly, the variables kept are very sensitive to the parameters. In any case, I use the original lambda parameter starting from 0.05.  
+LASSO narrowed down the predictor pool to `r nrow(lasso_coeffs_nz)-1` variables (plus intercept) that are actually very similar to Model 2: `r paste(lasso_coeffs_nz$variable[2:nrow(lasso_coeffs_nz)] , collapse = ', ')`.  
+
+## Diagnostics and comparing model results 
+
+```{r diagnostics , include = F }
+
+#create formulas again for re-running the models
+m1 <- feols( formula( paste0( "lnw ~ ", paste( model1_vars , collapse = " + " ) ) ) , data = df_work, vcov = 'hetero' )
+m2 <- feols( formula( paste0( "lnw ~ ", paste( model2_vars , collapse = " + " ) ) ) , data = df_work, vcov = 'hetero' )
+m3 <- feols( formula( paste0( "lnw ~ ", paste( model3_vars , collapse = " + " ) ) ) , data = df_work, vcov = 'hetero' )
+
+# Make prediction for the hold-out sample with each models
+m1_p <- predict( m1 , newdata = df_holdout )
+m2_p <- predict( m2 , newdata = df_holdout )
+m3_p <- predict( m1 , newdata = df_holdout )
+m4_p <- predict( lasso_model , newdata = df_holdout )
+#and on full sample
+m1_pf <- predict( m1 , newdata = df )
+m2_pf <- predict( m2 , newdata = df )
+m3_pf <- predict( m1 , newdata = df )
+m4_pf <- predict( lasso_model , newdata = df )
+
+# Calculate the RMSE on hold-out sample
+m1_rmse <- RMSE( m1_p , df_holdout$lnw)
+m2_rmse <- RMSE( m2_p , df_holdout$lnw)
+m3_rmse <- RMSE( m3_p , df_holdout$lnw)
+m4_rmse <- RMSE( m4_p , df_holdout$lnw)
+#and on full sample
+m1_rmsef <- RMSE( m1_pf , df$lnw)
+m2_rmsef <- RMSE( m2_pf , df$lnw)
+m3_rmsef <- RMSE( m3_pf , df$lnw)
+m4_rmsef <- RMSE( m4_pf , df$lnw)
+# Create a table
+sum <- cbind( rbind( m1_rmse , m2_rmse , m3_rmse , m4_rmse ) , 
+              rbind( m1_rmsef , m2_rmsef , m3_rmsef , m4_rmsef) )
+colnames(sum) <- c('Hold_RMSE' , 'Full_RMSE' )
+
+#merge with the original model_results table
+sum <- cbind( model_results , sum )
+
+#save predicted values into the corresponding datasets
+df_holdout$pred1 <- m1_p
+df_holdout$pred2 <- m2_p
+df_holdout$pred3 <- m3_p
+df_holdout$pred4 <- m4_p
+
+df$pred1 <- m1_pf
+df$pred2 <- m2_pf
+df$pred3 <- m3_pf
+df$pred4 <- m4_pf
+
+```
+
+The Models were run both on the hold-out set both on the full sample. The following table also includes the original model results on the working set.  
+
+```{r model_results , echo = F }
+sum %>% 
+  mutate_if( is.numeric, format, digits = 3 , nsmall = 0 ) %>% 
+  kable( row.names = F , align = "c") %>% 
+  kableExtra::kable_styling( latex_options = "hold_position")
+```
+
+R2 isn't much relevant in prediction, but it is worth mentioning that as expected, more variables we included in the model, the variables explained more of hourly wage's deviation: from `r round( min( sum[ , 3 ] )*100 , 2)`% it increased to `r round( max( sum[ , 3 ] )*100 , 2)`%.  
+BIC is lowest for Model 2, the very high number of coefficients in Model 3 inflated the BIC value.  
+As of RMSE values, Model 3 performed best on the test sample (5-fold cross-validation), but Model 2 was the best on the hold-out sample and on the full sample - better RMSE on the full sample as the sample size is 5-times larger. LASSO shrunk the 63 coefficients of Model 3 to 8 coefficient. These coefficients are quite similar to Model 2, the RMSE values are also very close. On the hold-out and full sample, Model 1 and Model 3 performed equally poorly. 
+
+## Conclusion
+In this report, I built 4 models to predict hourly wages in legal fields, using the 2014 CPS dataset. The first 3 model gradually became more complex, the 3rd model included 63 variables. The 4th Model was derived from Model 3 with LASSO.  
+Both based on BIC both based on RMSE (hold-out and full sample), Model 2 performed the best. LASSO was almost as good as Model 2 and choose quite similar values as I did for Model 2 using domain knowledge.  
+
