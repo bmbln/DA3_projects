@@ -13,13 +13,19 @@ rm( list = ls() )
 library(tidyverse)
 
 #1) Load and clean raw data 
+##locally
 listings <- as.data.frame ( fread("~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings.csv.gz") )
+### the .gz can't be read from GitHub directly, keeps giving back a HTTP error 404:
+# Error in curl::curl_download(input, tmpFile, mode = "wb", quiet = !showProgress) : 
+# HTTP error 404.
+### the original file saved into a .csv is way exceeding 100MB, get's refused by GitHub.
+
 
 #drop unnecessary/redundant/meaningless variables 
 to_drop <- c( "listing_url" , "scrape_id" , "name" , "description" , "neighborhood_overview" , "picture_url" , 
               "host_id" , "host_url" , "host_name" , "host_location" , "host_about" , "host_thumbnail_url" , "host_picture_url" , "host_neighbourhood" , "host_total_listings_count" , "host_verifications" ,
               "neighbourhood" , "neighbourhood_group_cleansed" , 
-              "latitude" , "longitude" , "property_type" ,
+              "latitude" , "longitude" ,
               "minimum_minimum_nights" , "maximum_minimum_nights" , "minimum_maximum_nights" , "maximum_maximum_nights" , 
               "minimum_nights_avg_ntm" , "maximum_nights_avg_ntm" , 
               "calendar_updated" , "calendar_last_scraped" , "first_review" , "license" , 
