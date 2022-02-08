@@ -28,7 +28,7 @@ to_drop <- c( "listing_url" , "scrape_id" , "name" , "description" , "neighborho
               "latitude" , "longitude" ,
               "minimum_minimum_nights" , "maximum_minimum_nights" , "minimum_maximum_nights" , "maximum_maximum_nights" , 
               "minimum_nights_avg_ntm" , "maximum_nights_avg_ntm" , 
-              "calendar_updated" , "calendar_last_scraped" , "first_review" , "license" , 
+              "calendar_updated" , "calendar_last_scraped" , "last_review" , "license" , 
               "calculated_host_listings_count" , "calculated_host_listings_count_entire_homes" , "calculated_host_listings_count_private_rooms" , "calculated_host_listings_count_shared_rooms")
 listings <- listings %>%
   select( -one_of( to_drop ) )
@@ -108,5 +108,5 @@ listings <- listings %>%
 
 
 ##SAVE THE SEMI-RAW DATASET
-#write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
+write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
 
