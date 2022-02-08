@@ -85,7 +85,7 @@ for (i in binary_varnames) {
     mutate( !!sym(i) := ifelse( !!sym(i) == "t" , 1 , ifelse( !!sym(i) == "f" , 0 , NA ) ) )
 }
 #the amenities as well! 
-listings[amenities_occurence$amenity] <-  sapply( listings[amenities_occurence$amenity] , as.numeric )
+listings[amenities_varnames] <-  sapply( listings[amenities_varnames] , as.numeric )
 
 #II.3. Percentage variables
 perc_varnames <- c( "host_response_rate" , "host_acceptance_rate" )
