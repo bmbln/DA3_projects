@@ -140,7 +140,7 @@ data <- data %>%
 
 #n_bathrooms: 0 , 1 , and above
 data <- data %>% 
-  mutate( d_bathrooms = as.factor( ifelse( 
+  mutate( fac_bathrooms = as.factor( ifelse( 
     n_bathrooms == 0 , "0" , ifelse(
       n_bathrooms == 1 , "1" , "1+" ) ) ) ) %>% 
   select( -n_bathrooms )
