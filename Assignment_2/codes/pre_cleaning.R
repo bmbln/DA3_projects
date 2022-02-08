@@ -60,8 +60,10 @@ for (i in 1:length(amenities)) {
 }
 #rbind it
 amenities_table <- rbindlist( amenities_table )
+#create new variable names for the amenities so we can recognize them later
+amenities_varnames <- paste( "am_" , amenities_occurence$amenity , sep = "")
 #rename the variables as they are called (73 different names)
-names(amenities_table) <- amenities_occurence$amenity
+names(amenities_table) <- amenities_varnames
 
 #I.STEP4
 #merge with the listings dataset
@@ -108,5 +110,5 @@ listings <- listings %>%
 
 
 ##SAVE THE SEMI-RAW DATASET
-write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
+#write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
 
