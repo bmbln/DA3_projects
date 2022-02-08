@@ -12,6 +12,7 @@ rm( list = ls() )
 #libraries
 library(tidyverse)
 library(data.table)
+library(modelsummary)
 
 P95 <- function(x){quantile(x,0.95,na.rm=T)}
 P99 <- function(x){quantile(x,0.99,na.rm=T)}
@@ -215,4 +216,8 @@ data <- data %>%
     n_accommodates3 = n_accommodates^3 , 
     n_bedrooms2 = n_bedrooms^2 , 
     n_bedrooms3 = n_bedrooms^3 , )
+
+##write cleaned dataset into a csv file 
+#write_csv( data , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/cleaned/paris_listings_clean.csv")
+
 
