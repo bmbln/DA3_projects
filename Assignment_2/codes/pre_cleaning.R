@@ -109,12 +109,11 @@ listings <- listings %>%
 listings <- listings %>% 
   mutate( price = as.numeric( gsub( "," , "" , gsub( "\\$" , "" , price ) ) ) ) #replace dollar sings and thousand separators
 
-#II.6. Fix typo in bouroughs
+#II.6. Fix typo in bouroughs. The special characters are screwing with csv, so let's remove all special characters
 listings <- listings %>% 
-  mutate( neighbourhood_cleansed = ifelse( 
-    neighbourhood_cleansed %in% c( "Patrepôt" , "Entrepô") , "Entrepôt" , ifelse( 
-      neighbourhood_cleansed == "Ménilmo" , "Ménilmontant" , neighbourhood_cleansed ) ) )
+  mutate( neighbourhood_cleansed = gsub( "[[:punct:]]", "", iconv( neighbourhood_cleansed , from = 'UTF-8', to = 'ASCII//TRANSLIT') ) )
 
 ##SAVE THE SEMI-RAW DATASET
 #write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
+
 
