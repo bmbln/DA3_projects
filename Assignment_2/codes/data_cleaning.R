@@ -176,6 +176,31 @@ data <- data %>%
   mutate( one_bathroom_per_bed = ifelse( is.na( one_bathroom_per_bed ) , 0 , one_bathroom_per_bed ) ) %>% 
   select( -c( "n_bathrooms" , "beds" ) )
 
+#availability: we have multiple variables on it, for how many days it is available in the next 30,60,90 and 365 days
+#feels redundant to keep all of them
+#people usually plan their trips 2-3 months ahead and there are some last minute travelers, so the 30 and 90 days windows seem to be the most relevant
+#let's also transform it as %
+
+data <- data %>% 
+  select( -c( "availability_60" , "availability_365" ) ) %>% 
+  mutate( availability_30 = availability_30/30 , 
+          availability_90 = availability_90/90 )
+
+ggplot(data2) + 
+  geom_density( aes( x = availability_30 ) , color = 'red' , alpha = .1) + 
+  geom_density( aes( x = availability_90 ) , fill = 'blue' , alpha = .5)
+
+#the density plots suggests that there are 2 main types of listings: 0 availability and full availability
+#let's pool both of them into dummy variables
+#fully_booked_30 and 90: available for less than 5% of the days (usually conflicts with min nights, so a good approximation)
+#no_bookings_30 and 90: available for almost all days, 97%. we leave some room for the 90 days period, in the 30 days no chance with one booked day
+data <- data %>% 
+  mutate( fully_booked_30 = ifelse( availability_30 < 0.05 , 1 , 0 ) ,
+          fully_booked_90 = ifelse( availability_90 < 0.05 , 1 , 0 ) , 
+          no_bookings_30 = ifelse( availability_30 > 0.97 , 1 , 0 ) , 
+          no_bookings_90 = ifelse( availability_90 > 0.97 , 1 , 0 ) ) %>% 
+  select( -c( "availability_30" , "availability_90" ) )
+
 
 #drop some extra unnecessary variables still kept
 to_drop <- c( "maximum_nights" , "id" )
@@ -190,13 +215,13 @@ data <- filter( data , accommodates < 7 & accommodates > 1 )
 #I.4. rename the variables by type so we can easily work with them 
 #dummies (without amenities that are already am_something)
 dnames <- c( "host_is_superhost" , "host_has_profile_pic" , "host_identity_verified" , 
-             "has_availability" , "instant_bookable" , "sep_bedroom" , "one_bathroom_per_bed" , "more_bathrooms" )
+             "has_availability" , "instant_bookable" , "sep_bedroom" , "one_bathroom_per_bed" , "more_bathrooms" ,
+             "no_bookings_30" , "no_bookings_90" , "fully_booked_30" , "fully_booked_90" )
 dnames_i <- match(dnames, colnames(data))
 colnames(data)[dnames_i] <- paste0( "d_", dnames)
 
 #numerical
 nnames <- c( "accommodates" , "bedrooms" , "price" , 
-             "availability_30" , "availability_60" , "availability_90" , "availability_365" , 
              "review_scores_rating" , "reviews_per_month" , 
              "days_since" )
 nnames_i <- match(nnames, colnames(data))
