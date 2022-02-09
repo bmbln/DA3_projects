@@ -11,6 +11,7 @@
 rm( list = ls() )
 #libraries
 library(tidyverse)
+library(data.table)
 
 #1) Load and clean raw data 
 ##locally
@@ -104,10 +105,13 @@ listings <- listings %>%
   mutate( n_bathrooms = ifelse ( is.na( bathrooms ),  n_bathrooms , NA ) ) %>% #NA also got a value of 1 in previous step, first step helps with real NA
   select( -bathrooms ) #let's remove the technical, redundant variable
 
-#II.4. Fix price variable (stored as a text, devise incl)
+#II.5. Fix price variable (stored as a text, devise incl)
 listings <- listings %>% 
   mutate( price = as.numeric( gsub( "," , "" , gsub( "\\$" , "" , price ) ) ) ) #replace dollar sings and thousand separators
 
+#II.6. Fix typo in bouroughs
+listings <- listings %>% 
+  mutate( neighbourhood_cleansed = ifelse( neighbourhood_cleansed == "Entrepô" , "Entrepôt" , neighbourhood_cleansed ) )
 
 ##SAVE THE SEMI-RAW DATASET
 #write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
