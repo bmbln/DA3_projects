@@ -111,7 +111,9 @@ listings <- listings %>%
 
 #II.6. Fix typo in bouroughs
 listings <- listings %>% 
-  mutate( neighbourhood_cleansed = ifelse( neighbourhood_cleansed == "Entrepô" , "Entrepôt" , neighbourhood_cleansed ) )
+  mutate( neighbourhood_cleansed = ifelse( 
+    neighbourhood_cleansed %in% c( "Patrepôt" , "Entrepô") , "Entrepôt" , ifelse( 
+      neighbourhood_cleansed == "Ménilmo" , "Ménilmontant" , neighbourhood_cleansed ) ) )
 
 ##SAVE THE SEMI-RAW DATASET
 #write_csv( listings , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/raw/listings_for_analysis.csv")
