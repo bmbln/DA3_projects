@@ -248,7 +248,7 @@ data <- data %>%
     n_bedrooms2 = n_bedrooms^2 , 
     n_bedrooms3 = n_bedrooms^3 , )
 
-##write cleaned dataset into a csv file 
+##write cleaned dataset into a csv file then upload to GitHub to be called later
 #write_csv( data , "~/Documents/CEU/DA3/DA3_projects/Assignment_2/data/cleaned/paris_listings_clean.csv")
 
 
