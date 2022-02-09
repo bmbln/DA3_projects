@@ -138,13 +138,6 @@ data <- data %>%
         host_listings_count < 6 , "2-5" , "5+"
       ) ) ) ) )
 
-#n_bathrooms: 0 , 1 , and above
-data <- data %>% 
-  mutate( fac_bathrooms = as.factor( ifelse( 
-    n_bathrooms == 0 , "0" , ifelse(
-      n_bathrooms == 1 , "1" , "1+" ) ) ) ) %>% 
-  select( -n_bathrooms )
-
 #number_of_reviews: 0 , 1-50 , 50+
 data <- data %>% 
   mutate( number_of_reviews = as.factor( ifelse( 
@@ -170,8 +163,19 @@ data <- data %>%
 #if beds number 0 (probably a couch offered), missing value - assign 0 to sep_bedroom
 data <- data %>% 
   mutate( sep_bedroom = ifelse( bedrooms/beds < 1 , 0 , 1 ) ) %>% 
-  mutate( sep_bedroom = ifelse( is.na( sep_bedroom) , 0 , sep_bedroom ) ) %>% 
-  select( -beds)
+  mutate( sep_bedroom = ifelse( is.na( sep_bedroom ) , 0 , sep_bedroom ) )
+
+#n_bathrooms: 0 is unrealistic and very very low frequency, so let's make it into a dummy variable if one or more bathrooms
+data <- data %>% 
+  mutate( more_bathrooms = as.factor( ifelse( 
+    n_bathrooms == 0 , 0 , ifelse(
+      n_bathrooms == 1 , 0 , 1 ) ) ) ) 
+#just like for the beds, what really matters is the relative number of bathrooms. Let's compare to the number of beds, 1 if same otherwise 0
+data <- data %>% 
+  mutate( one_bathroom_per_bed = ifelse( n_bathrooms/beds < 1 , 0 , 1 ) ) %>% 
+  mutate( one_bathroom_per_bed = ifelse( is.na( one_bathroom_per_bed ) , 0 , one_bathroom_per_bed ) ) %>% 
+  select( -c( "n_bathrooms" , "beds" ) )
+
 
 #drop some extra unnecessary variables still kept
 to_drop <- c( "maximum_nights" , "id" )
@@ -185,7 +189,8 @@ data <- filter( data , accommodates < 7 & accommodates > 1 )
 
 #I.4. rename the variables by type so we can easily work with them 
 #dummies (without amenities that are already am_something)
-dnames <- c( "host_is_superhost" , "host_has_profile_pic" , "host_identity_verified" , "has_availability" , "instant_bookable" , "sep_bedroom" )
+dnames <- c( "host_is_superhost" , "host_has_profile_pic" , "host_identity_verified" , 
+             "has_availability" , "instant_bookable" , "sep_bedroom" , "one_bathroom_per_bed" , "more_bathrooms" )
 dnames_i <- match(dnames, colnames(data))
 colnames(data)[dnames_i] <- paste0( "d_", dnames)
 
