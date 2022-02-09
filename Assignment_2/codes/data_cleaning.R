@@ -178,27 +178,23 @@ data <- data %>%
 
 #availability: we have multiple variables on it, for how many days it is available in the next 30,60,90 and 365 days
 #feels redundant to keep all of them
-#people usually plan their trips 1-3 months ahead and there are some last minute travelers, so the 30 and 90 days windows seem to be the most relevant
+#people usually plan their trips 1-3 months ahead and there are some last minute travelers
 #the 30 days is deducted from the 90 days, so we can see how many days available for the 1-3 months planners
 #let's also transform it as %
 
 data <- data %>% 
   select( -c( "availability_60" , "availability_365" ) ) %>% 
-  mutate( availability_30 = availability_30 / 30 , 
-          availability_90 = ( availability_90 - availability_30 ) / 90 )
+  mutate( availability_90 = ( availability_90 - availability_30 ) / 90 )
 
-ggplot(data) + 
-  geom_density( aes( x = availability_30 ) , color = 'red' , alpha = .1) + 
+ggplot(data) +  
   geom_density( aes( x = availability_90 ) , fill = 'blue' , alpha = .5)
 
 #the density plots suggests that there are 2 main types of listings: 0 availability and full availability
 #let's pool both of them into dummy variables
-#unavailable_30 and 31_90: available for less than 5% of the days (usually conflicts with min nights, so a good approximation)
-#no_bookings_30 and 31_90: available for almost all days, 95%. we leave some room for the 90 days period, in the 30 days no chance with one booked day
+#unavailable_31_90: available for less than 5% of the days (usually conflicts with min nights, so a good approximation)
+#no_bookings_31_90: available for almost all days, 95%.
 data <- data %>% 
-  mutate( unavailable_30 = ifelse( availability_30 < 0.05 , 1 , 0 ) ,
-          unavailable_31_90 = ifelse( availability_90 < 0.05 , 1 , 0 ) , 
-          no_bookings_30 = ifelse( availability_30 > 0.95 , 1 , 0 ) , 
+  mutate( unavailable_31_90 = ifelse( availability_90 < 0.05 , 1 , 0 ) , 
           no_bookings_31_90 = ifelse( availability_90 > 0.95 , 1 , 0 ) ) %>% 
   select( -c( "availability_30" , "availability_90" ) )
 
@@ -217,7 +213,7 @@ data <- filter( data , accommodates < 7 & accommodates > 1 )
 #dummies (without amenities that are already am_something)
 dnames <- c( "host_is_superhost" , "host_has_profile_pic" , "host_identity_verified" , 
              "has_availability" , "instant_bookable" , "sep_bedroom" , "one_bathroom_per_bed" , "more_bathrooms" ,
-             "no_bookings_30" , "no_bookings_31_90" , "unavailable_30" , "unavailable_31_90" )
+             "no_bookings_31_90" , "unavailable_31_90" )
 dnames_i <- match(dnames, colnames(data))
 colnames(data)[dnames_i] <- paste0( "d_", dnames)
 
