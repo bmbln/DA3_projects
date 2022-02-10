@@ -209,6 +209,9 @@ data <- data %>%
 #let's filter out accommodates below 2 and above 6 
 data <- filter( data , accommodates < 7 & accommodates > 1 )
 
+#there are some very odd observations with 7-9 bedrooms and less accommodates. let's filter these out as well
+data <- filter( data , bedrooms < 7 )
+
 #I.4. rename the variables by type so we can easily work with them 
 #dummies (without amenities that are already am_something)
 dnames <- c( "host_is_superhost" , "host_has_profile_pic" , "host_identity_verified" , 
@@ -234,9 +237,6 @@ colnames(data)[facnames_i] <- paste0( "fac_", facnames)
 #I.4.Add log and quadratic variables for some numeric 
 data <- data %>%
   mutate(
-    ln_days_since = log( n_days_since + 1 ) ,
-    ln_days_since2 = log( n_days_since + 1 )^2 ,
-    ln_days_since3 = log( n_days_since + 1 )^3 ,
     n_days_since2 = n_days_since^2 ,
     n_days_since3 = n_days_since^3 , 
     n_accommodates2 = n_accommodates^2 , 
