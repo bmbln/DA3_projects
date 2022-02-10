@@ -20,7 +20,7 @@ library(fixest)
 library(rattle)
 
 ##LOAD CLEAN DATA 
-data <- read_csv( "https://raw.githubusercontent.com/bmbln/DA3_projects/main/Assignment_2/data/cleaned/paris_listings_clean.csv?token=GHSAT0AAAAAABORYEVOHGXZ2MVMUDLGFZCUYQNC4VA") %>% 
+data <- read_csv( "https://raw.githubusercontent.com/bmbln/DA3_projects/main/Assignment_2/data/cleaned/paris_listings_clean.csv") %>% 
   mutate_if( is.character, factor )
 
   

@@ -24,7 +24,7 @@ Range <- function(x){max(x,na.rm=T)-min(x,na.rm=T)}
 ##LOAD AND CLEAN##
 ##################
 #load data
-data <- read_csv( "https://raw.githubusercontent.com/bmbln/DA3_projects/main/Assignment_2/data/raw/listings_for_analysis.csv?token=GHSAT0AAAAAABORYEVOKZMORQIHO24A3OMUYQLLBTA") %>% 
+data <- read_csv( "https://raw.githubusercontent.com/bmbln/DA3_projects/main/Assignment_2/data/raw/listings_for_analysis.csv") %>% 
   mutate_if(is.character, factor)
 
 ########################
