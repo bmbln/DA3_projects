@@ -204,5 +204,5 @@ HO_summary_results %>%
   kableExtra::kable_styling( latex_options = "hold_position")
 ```
 
-Furthermore, the confusion table was calculated for each model on the hold-out set (best CV threshold used in the calculation), displayed for the best performing RF model.
+Furthermore, the confusion table was calculated for each model on the hold-out set (best CV threshold used in the calculation), and calibration curves created for each model.  
 

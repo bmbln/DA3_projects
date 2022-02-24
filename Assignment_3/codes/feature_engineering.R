@@ -35,14 +35,14 @@ table(data$ind2_cat)
 
 # Firm characteristics
 ##Age: 
-ggplot( data = data, aes( x = age , y = as.numeric( high_growth ) ) ) +
+ggplot( data = data, aes( x = age , y = high_growth ) ) +
   geom_smooth( method = "lm" , formula = y ~ poly( x , 2 ) , color = 'black' , se = F , size = 1  ) +
   geom_smooth( method = "loess" , se = F , colour = 'red' , size = 1 , span = 0.9 ) +
   ylim( 0 , 1 ) +
   labs( x = "Age in years" , 
         y = "HGC (probability)" ,
         title = "Modelling firm's age" , 
-        subtitle = "Black: quadratic function \nRed: actual age variable") +
+        subtitle = "Black: second order polynomial \nRed: actual age variable") +
   theme_bw()
 #should use quadratic form, although it overestimates the old end
 
@@ -110,6 +110,46 @@ data <- data %>%
   mutate_at( vars( any ) , funs( "flag_zero" = as.numeric( . == 0 ) ) ) %>%
   mutate_at( vars( any ) , funs( "quad" = .^2 ) )
 
+#check if it really worth modelling with quadratic forms. 
+ggplot( data = data, aes( x = extra_profit_loss_pl , y = high_growth ) ) +
+    geom_point( size = .1 , fill = "blue" , color = "blue" ) +
+    geom_smooth( method = "lm" , formula = y ~ x , color = 'yellow' , se = F , size = .5 ) +
+    geom_smooth( method = "lm" , formula = y ~ poly( x , 2 ) , color = 'black' , se = F , size = .5 ) +
+    geom_smooth( method = "loess" , se = T , colour = 'red' , size = .5 , span = 0.9 ) +
+    labs( y = "HGC" , 
+          subtitle = "Black: second order polynomial \nYellow: linear function \nRed: actual variable ") +
+    theme_bw()
+
+ggplot( data = data, aes( x = inc_bef_tax_pl , y = high_growth ) ) +
+  geom_point( size = .1 , fill = "blue" , color = "blue" ) +
+  geom_smooth( method = "lm" , formula = y ~ x , color = 'yellow' , se = F , size = .5 ) +
+  geom_smooth( method = "lm" , formula = y ~ poly( x , 2 ) , color = 'black' , se = F , size = .5 ) +
+  geom_smooth( method = "loess" , se = T , colour = 'red' , size = .5 , span = 0.9 ) +
+  labs( y = "HGC" , 
+        subtitle = "Black: second order polynomial \nYellow: linear function \nRed: actual variable ") +
+  theme_bw()
+
+
+ggplot( data = data, aes( x = profit_loss_year_pl , y = high_growth ) ) +
+  geom_point( size = .1 , fill = "blue" , color = "blue" ) +
+  geom_smooth( method = "lm" , formula = y ~ x , color = 'yellow' , se = F , size = .5 ) +
+  geom_smooth( method = "lm" , formula = y ~ poly( x , 2 ) , color = 'black' , se = F , size = .5 ) +
+  geom_smooth( method = "loess" , se = T , colour = 'red' , size = .5 , span = 0.9 ) +
+  labs( y = "HGC" , 
+        subtitle = "Black: second order polynomial \nYellow: linear function \nRed: actual variable ") +
+  theme_bw()
+
+ggplot( data = data, aes( x = share_eq_bs , y = high_growth ) ) +
+  geom_point( size = .1 , fill = "blue" , color = "blue" ) +
+  geom_smooth( method = "lm" , formula = y ~ x , color = 'yellow' , se = F , size = .5 ) +
+  geom_smooth( method = "lm" , formula = y ~ poly( x , 2 ) , color = 'black' , se = F , size = .5 ) +
+  geom_smooth( method = "loess" , se = T , colour = 'red' , size = .5 , span = 0.9 ) +
+  labs( y = "HGC" , 
+        subtitle = "Black: second order polynomial \nYellow: linear function \nRed: actual variable ") +
+  theme_bw()
+
+#they mostly look horrible, non-linear and and second order polynomial won't capture it... 
+#for most of it, at least a 4 or 5 order polynomial would be necessary, at least to capture what's going on around 0 value. 
 
 ########################################################################
 # additional
@@ -161,7 +201,7 @@ ggplot( data = data, aes( x = sales_mil_log , y = high_growth ) ) +
   labs( x = "Sales (log, million EUR)" , 
         y = "HGC" , 
         title = "Modelling sales" , 
-        subtitle = "Black: quadratic function \nYellow: linear function \nRed: actual variable ") +
+        subtitle = "Black: second order polynomial \nYellow: linear function \nRed: actual variable ") +
   theme_bw()
 
 #quadratic form isn't necessary
@@ -193,7 +233,7 @@ ggplot( data = data , aes(x = d1_sales_mil_log_mod , y = high_growth ) ) +
   labs( x = "Historical growth rate (Diff of ln sales)" , 
         y = "HGC (future)" ,
         title = "Modelling historical growth" , 
-        subtitle = "Black: cubic function \nRed: actual variable ") +
+        subtitle = "Black: Third order polynomial \nRed: actual variable ") +
   theme_bw()
 
 #well captured with a 3rd order polynomial, so let's create new variables
